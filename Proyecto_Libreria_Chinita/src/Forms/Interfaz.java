@@ -4,12 +4,17 @@ import Logica.Cls_Proveedor;
 import Logica.Cls_Usuarios;
 import Logica.Compra;
 import Logica.CompraDao;
+import Logica.ConexionBD;
 import Logica.Producto;
 import Logica.Venta;
 import Logica.VentaDao;
+import com.mysql.jdbc.Statement;
 import java.awt.Color;
 import java.awt.HeadlessException;
 import java.awt.event.KeyEvent;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.logging.Level;
@@ -28,6 +33,7 @@ public class Interfaz extends javax.swing.JFrame {
     int empleado=0;
     String nombreEmpleado="";
     Venta v = new Venta();
+    ConexionBD cnx = new ConexionBD();
     
     
         //Variable que controla el total de la venta
@@ -163,18 +169,42 @@ public class Interfaz extends javax.swing.JFrame {
         this.nombreEmpleado=n;
     }
     private void ConfirmarVenta() throws SQLException, Exception{
-        int id = 0;
-        int result = JOptionPane.showConfirmDialog(frame,"¿Seguro? ¿Quieres confirmar esta venta?", "Confirmar Venta",
-          JOptionPane.YES_NO_OPTION,
-          JOptionPane.QUESTION_MESSAGE);
-       if(result == JOptionPane.YES_OPTION){
-            try {
+        //Aca debemos de colocar las transacciones
+        //
+        //
+        //
+        Connection cn = null;
+        PreparedStatement ps = null;
+        PreparedStatement ps2 = null;
+        int id = 0,res=0;
+        ResultSet Resultado;
+        String SQL_INSERT = "INSERT INTO libreria1.venta(Fecha,Total,Usuario_id,Anulada)" + "VALUES(?,?,?,?)";
+        String SQL_INSERT2 = "INSERT INTO libreria1.detalleventa(Cantidad,Subtotal,Venta_ID,Inventario_ID)" + "VALUES(?,?,?,?)";
+        
+        try {
+            cn = cnx.getConnection();
+            cn.setAutoCommit(false);
                 //Inserta una nueva venta
-                
-                id = nuevaVenta.InsertarVenta(totalVenta,empleado);;
-            } catch (SQLException ex) {
-                Logger.getLogger(Interfaz.class.getName()).log(Level.SEVERE, null, ex);
+                //aca va la parte 1
+            ps = cn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS);
+            ps.setDate(1, null);
+            ps.setFloat(2, totalVenta);
+            ps.setInt(3, empleado);
+            ps.setInt(4, 0);
+            res = ps.executeUpdate();
+            Resultado = (ResultSet) ps.getGeneratedKeys();
+             if (Resultado.next()) {
+                id = Resultado.getInt(1);
+             }
+            if (res > 0) {
+                JOptionPane.showMessageDialog(null, "Registro Guardado..........");
+            }else{
+                cn.rollback();
+                JOptionPane.showMessageDialog(null, "Fallo la transaccion");
             }
+                //termina
+                //id = nuevaVenta.InsertarVenta(totalVenta,empleado);;
+       
             
             
             //Insertar los datos de la venta
@@ -182,23 +212,53 @@ public class Interfaz extends javax.swing.JFrame {
             for(int i=0;i<filas;i++){
               
               //Inserta en la base de datos
-                      int cantidad = (int) (dtm.getValueAt(i, 2));
-                      float subTotal = (float) (dtm.getValueAt(i, 4));
-                      String codVenta = (String) (dtm.getValueAt(i, 0));
-                      int codigo = Integer.parseInt(codVenta);
-                
-                      nuevaVenta.InsertarDatosVenta(cantidad, subTotal, id, codigo);
-               
-              }
+                    int cantidad = (int) (dtm.getValueAt(i, 2));
+                    float subTotal = (float) (dtm.getValueAt(i, 4));
+                    String codVenta = (String) (dtm.getValueAt(i, 0));
+                    int codigo = Integer.parseInt(codVenta);
+                    //aca va la parte 1
+                    ps = cn.prepareStatement(SQL_INSERT2);
+                    ps.setInt(1, cantidad);
+                    ps.setFloat(2,subTotal);
+                    ps.setInt(3, id);
+                    ps.setInt(4, codigo);
+                    int res2 = ps.executeUpdate();
             
+            if (res2 > 0) {
+                JOptionPane.showMessageDialog(null, "Registro Guardado..........");
+            }else{
+                cn.rollback();
+                JOptionPane.showMessageDialog(null, "Fallo la transaccion");
+            }
+                      //termina
+                      //nuevaVenta.InsertarDatosVenta(cantidad, subTotal, id, codigo);
+               
+            }
+            int result = JOptionPane.showConfirmDialog(frame,"¿Seguro? ¿Quieres confirmar esta venta?", "Confirmar Venta",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
+            if(result == JOptionPane.YES_OPTION){
               //Borra toda la linea
-            filas=dtm.getRowCount();
-            for(int i=0;i<filas;i++){
-               dtm.removeRow(0);
+                cn.commit();
+                filas=dtm.getRowCount();
+                for(int i=0;i<filas;i++){
+                dtm.removeRow(0);
+                }
+                LimpiarVenta();
+
+            }else{
+                cn.rollback();
+                JOptionPane.showMessageDialog(null, "Transaccion Cancelada");
             }
             //Por ultimo tiene que limpiar todo 
-            LimpiarVenta();
-       }
+       } catch (SQLException ex) {
+            cn.rollback();
+            JOptionPane.showMessageDialog(null, "Transaccion Cancelada");
+            Logger.getLogger(Interfaz.class.getName()).log(Level.SEVERE, null, ex);
+        }finally{
+            ps = null;
+            cn.close();
+        }
     }
     private void LimpiarVenta(){
         CodigoTxt.setText("");
@@ -286,43 +346,95 @@ public class Interfaz extends javax.swing.JFrame {
     }
     
     private void ConfirmarCompra() throws SQLException, Exception{
-        int id = 0;
-        int result = JOptionPane.showConfirmDialog(frame,"¿Seguro? ¿Quieres confirmar esta compra?", "Confirmar Compra",
-          JOptionPane.YES_NO_OPTION,
-          JOptionPane.QUESTION_MESSAGE);
-       if(result == JOptionPane.YES_OPTION){
-            try {
+        //aca van las cosas necesarias para la insercion
+        Connection cn = null;
+        PreparedStatement ps = null;
+        PreparedStatement ps2 = null;
+        int id = 0,res=0;
+        ResultSet Resultado;
+        String SQL_INSERT = "INSERT INTO libreria1.compra(Fecha,Total,Usuario_ID,Proveedor_ID)" + " VALUES(?,?,?,?)";
+        String SQL_INSERT2 = "INSERT INTO libreria1.detallecompra(Cantidad,Subtotal,Compra_ID,Inventario_ID)" + " VALUES(?,?,?,?)";
+        //aca debe ir la segunda transaccion
+        //
+        //
+        //
+        try {
+            cn = cnx.getConnection();
+            cn.setAutoCommit(false);
                 //Inserta una nueva compra
                 int id_proveedor = Integer.parseInt(CodigoProveedor.getText());
-                id = nuevaCompra.InsertarCompra(totalCompra,id_proveedor,empleado);;
-            } catch (HeadlessException | SQLException e) {
-                System.err.println("Error al guardar los datos en la base de datos aca: " + e.getMessage());
-            }
-            
-            
+                //aca debe de ir el codigo que inserta una nueva compra
+                        ps = cn.prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS);
+                        ps.setDate(1, null);
+                        ps.setFloat(2, totalCompra);
+                        ps.setInt(3, empleado);
+                        ps.setInt(4, id_proveedor);
+                        res = ps.executeUpdate();
+                        Resultado = (ResultSet) ps.getGeneratedKeys();
+                         if (Resultado.next()) {
+                            //regresa el id que sirve para insertar varias compras
+                            id = Resultado.getInt(1);
+                         }
+                        if (res > 0) {
+                            JOptionPane.showMessageDialog(null, "Registro Guardado..........");
+                        }else{
+                            cn.rollback();
+                            JOptionPane.showMessageDialog(null, "Fallo la transaccion");
+                        }                     
+                //aca termina
             //Insertar los datos de la venta
             int filas=dtmC.getRowCount();
             for(int i=0;i<filas;i++){
               
               //Inserta en la base de datos
-                      int cantidad = (int) (dtmC.getValueAt(i, 3));
-                      float subTotal = (float) (dtmC.getValueAt(i, 5));
-                      String codCompra = (String) (dtmC.getValueAt(i, 0));
-                      int codigo = Integer.parseInt(codCompra);
+                int cantidad = (int) (dtmC.getValueAt(i, 3));
+                float subTotal = (float) (dtmC.getValueAt(i, 5));
+                String codCompra = (String) (dtmC.getValueAt(i, 0));
+                int codigo = Integer.parseInt(codCompra);
                 
-                      nuevaCompra.InsertarDatosCompra(cantidad, subTotal, id, codigo);
-               
-              }
+                //Aca debe de ir el codigo que actualiza los datos de compra
+                ps2 = cn.prepareStatement(SQL_INSERT2);
+                ps2.setInt(1, cantidad);
+                ps2.setFloat(2,subTotal);
+                ps2.setInt(3, id);
+                ps2.setInt(4, codigo);
+                int res2 = ps2.executeUpdate();
             
-              //Borra toda la linea
-            filas=dtmC.getRowCount();
-            for(int i=0;i<filas;i++){
-               dtmC.removeRow(0);
+                if (res2 > 0) {
+                    JOptionPane.showMessageDialog(null, "Registro Guardado..........");
+                }else{
+                    cn.rollback();
+                    JOptionPane.showMessageDialog(null, "Fallo la transaccion");
+                }
+                      //aca termina
             }
-            //Por ultimo tiene que limpiar todo 
-            LimpiarVenta();
-       }
+            
+            int result = JOptionPane.showConfirmDialog(frame,"¿Seguro? ¿Quieres confirmar esta compra?", "Confirmar Compra",
+              JOptionPane.YES_NO_OPTION,
+              JOptionPane.QUESTION_MESSAGE);
+            if(result == JOptionPane.YES_OPTION){
+                cn.commit();
+           
+                //Borra toda la linea
+                int filas2=dtmC.getRowCount();
+                for(int i=0;i<filas2;i++){
+                   dtmC.removeRow(0);
+                }
+                //Por ultimo tiene que limpiar todo 
+                LimpiarVenta();
+            }else{
+                cn.rollback();
+                JOptionPane.showMessageDialog(null, "Transaccion Cancelada");
+            }
+        }catch(Exception e){
+            cn.rollback();
+            JOptionPane.showMessageDialog(null, "Fallo la transaccion");
+        }finally{
+            ps = null;
+            cn.close();
+        }
     }
+    
     private void LimpiarCompra(){
         CodigoCompraTxt.setText("");
         NombreCompraTxt.setText("");
@@ -488,6 +600,8 @@ public class Interfaz extends javax.swing.JFrame {
         btnPdfVentas = new javax.swing.JButton();
         txtIdVenta = new javax.swing.JTextField();
         jLabel38 = new javax.swing.JLabel();
+        jPanel23 = new javax.swing.JPanel();
+        jPanel24 = new javax.swing.JPanel();
         jScrollPane3 = new javax.swing.JScrollPane();
         HIstorialVentasjTable = new javax.swing.JTable();
         jScrollPane4 = new javax.swing.JScrollPane();
@@ -1613,6 +1727,32 @@ public class Interfaz extends javax.swing.JFrame {
         jLabel38.setText("Opcion:");
         jPanel9.add(jLabel38, new org.netbeans.lib.awtextra.AbsoluteConstraints(190, 40, -1, -1));
 
+        javax.swing.GroupLayout jPanel23Layout = new javax.swing.GroupLayout(jPanel23);
+        jPanel23.setLayout(jPanel23Layout);
+        jPanel23Layout.setHorizontalGroup(
+            jPanel23Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 60, Short.MAX_VALUE)
+        );
+        jPanel23Layout.setVerticalGroup(
+            jPanel23Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 50, Short.MAX_VALUE)
+        );
+
+        jPanel9.add(jPanel23, new org.netbeans.lib.awtextra.AbsoluteConstraints(10, 30, 60, 50));
+
+        javax.swing.GroupLayout jPanel24Layout = new javax.swing.GroupLayout(jPanel24);
+        jPanel24.setLayout(jPanel24Layout);
+        jPanel24Layout.setHorizontalGroup(
+            jPanel24Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 60, Short.MAX_VALUE)
+        );
+        jPanel24Layout.setVerticalGroup(
+            jPanel24Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 50, Short.MAX_VALUE)
+        );
+
+        jPanel9.add(jPanel24, new org.netbeans.lib.awtextra.AbsoluteConstraints(80, 30, 60, 50));
+
         jPanel16.add(jPanel9, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, 1060, 100));
 
         HIstorialVentasjTable.setModel(new javax.swing.table.DefaultTableModel(
@@ -2706,6 +2846,8 @@ public class Interfaz extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel20;
     private javax.swing.JPanel jPanel21;
     private javax.swing.JPanel jPanel22;
+    private javax.swing.JPanel jPanel23;
+    private javax.swing.JPanel jPanel24;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
     private javax.swing.JPanel jPanel5;

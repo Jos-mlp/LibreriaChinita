@@ -51,7 +51,7 @@ public class CompraDao {
     
     // Metodo Insercion
     //Este metodo esta hecho para que regrese la llave primaria del dato insertado
-        public int InsertarCompra(float total,int proveedor, int usuario) throws Exception {
+       /* public int InsertarCompra(float total,int proveedor, int usuario) throws Exception {
         int id = 0,res=0;
         try {
             ps = cn.getConnection().prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS);
@@ -99,7 +99,9 @@ public class CompraDao {
                 ps = null;
                 cn.close();
             }
-        }
+        }*/
+        
+      
         
         public List Listarcompras(){
        List<Compra> ListaCompra = new ArrayList();

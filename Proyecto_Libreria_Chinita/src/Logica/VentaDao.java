@@ -38,7 +38,7 @@ public class VentaDao {
     private PreparedStatement ps;
     private ResultSet rs;;
     private static ResultSet Resultado;
-    private final ConexionBD cn = new ConexionBD();;
+    private final ConexionBD cn = new ConexionBD();
     
     public VentaDao(){
         
@@ -72,7 +72,7 @@ public class VentaDao {
     
      // Metodo Insercion
     //Este metodo esta hecho para que regrese la llave primaria del dato insertado
-        public int InsertarVenta(float total, int usuario) throws Exception {
+        /*public int InsertarVenta(float total, int usuario) throws Exception {
         int id = 0,res=0;
         try {
             ps = cn.getConnection().prepareStatement(SQL_INSERT, Statement.RETURN_GENERATED_KEYS);
@@ -98,9 +98,9 @@ public class VentaDao {
         }
 
         return id;
-    }
+    }*/
     
-    public void InsertarDatosVenta(int cantidad, float subtotal, int ventaID, int inventarioID) throws SQLException{
+    /*public void InsertarDatosVenta(int cantidad, float subtotal, int ventaID, int inventarioID) throws SQLException{
         try {
             ps = cn.getConnection().prepareStatement(SQL_INSERT2);
             ps.setInt(1, cantidad);
@@ -120,7 +120,7 @@ public class VentaDao {
                 ps = null;
                 cn.close();
             }
-    }
+    }*/
     
         public List Listarventas(){
        List<Venta> ListaVenta = new ArrayList();
